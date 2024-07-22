@@ -7,19 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		340EAF922C4BC4E200698795 /* WYDTS_ForensicsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAF912C4BC4E200698795 /* WYDTS_ForensicsApp.swift */; };
-		340EAF942C4BC4E200698795 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAF932C4BC4E200698795 /* ContentView.swift */; };
+		340EAF942C4BC4E200698795 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAF932C4BC4E200698795 /* Main.swift */; };
 		340EAF962C4BC4E300698795 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 340EAF952C4BC4E300698795 /* Assets.xcassets */; };
 		340EAF992C4BC4E300698795 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 340EAF982C4BC4E300698795 /* Preview Assets.xcassets */; };
+		340EAFA22C4C447F00698795 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAFA12C4C447F00698795 /* ContentView.swift */; };
+		340EAFA42C4C475A00698795 /* LeftView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAFA32C4C475A00698795 /* LeftView.swift */; };
+		340EAFA62C4C47A400698795 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAFA52C4C47A400698795 /* MainView.swift */; };
+		340EAFA82C4C47D700698795 /* RightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAFA72C4C47D700698795 /* RightView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		340EAF8E2C4BC4E200698795 /* WYDTS Forensics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "WYDTS Forensics.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		340EAF912C4BC4E200698795 /* WYDTS_ForensicsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WYDTS_ForensicsApp.swift; sourceTree = "<group>"; };
-		340EAF932C4BC4E200698795 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		340EAF932C4BC4E200698795 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Main.swift; sourceTree = "<group>"; };
 		340EAF952C4BC4E300698795 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		340EAF982C4BC4E300698795 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		340EAF9A2C4BC4E300698795 /* WYDTS_Forensics.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WYDTS_Forensics.entitlements; sourceTree = "<group>"; };
+		340EAFA02C4C383100698795 /* WYDTS-Forensics-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "WYDTS-Forensics-Info.plist"; sourceTree = SOURCE_ROOT; };
+		340EAFA12C4C447F00698795 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		340EAFA32C4C475A00698795 /* LeftView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftView.swift; sourceTree = "<group>"; };
+		340EAFA52C4C47A400698795 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		340EAFA72C4C47D700698795 /* RightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RightView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,9 +59,13 @@
 		340EAF902C4BC4E200698795 /* WYDTS Forensics */ = {
 			isa = PBXGroup;
 			children = (
-				340EAF912C4BC4E200698795 /* WYDTS_ForensicsApp.swift */,
-				340EAF932C4BC4E200698795 /* ContentView.swift */,
+				340EAFA02C4C383100698795 /* WYDTS-Forensics-Info.plist */,
+				340EAFA12C4C447F00698795 /* ContentView.swift */,
+				340EAFA32C4C475A00698795 /* LeftView.swift */,
+				340EAFA52C4C47A400698795 /* MainView.swift */,
+				340EAFA72C4C47D700698795 /* RightView.swift */,
 				340EAF952C4BC4E300698795 /* Assets.xcassets */,
+				340EAF932C4BC4E200698795 /* Main.swift */,
 				340EAF9A2C4BC4E300698795 /* WYDTS_Forensics.entitlements */,
 				340EAF972C4BC4E300698795 /* Preview Content */,
 			);
@@ -139,8 +150,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				340EAF942C4BC4E200698795 /* ContentView.swift in Sources */,
-				340EAF922C4BC4E200698795 /* WYDTS_ForensicsApp.swift in Sources */,
+				340EAFA22C4C447F00698795 /* ContentView.swift in Sources */,
+				340EAFA62C4C47A400698795 /* MainView.swift in Sources */,
+				340EAFA82C4C47D700698795 /* RightView.swift in Sources */,
+				340EAFA42C4C475A00698795 /* LeftView.swift in Sources */,
+				340EAF942C4BC4E200698795 /* Main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -279,6 +293,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "WYDTS-Forensics-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -306,6 +321,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "WYDTS-Forensics-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

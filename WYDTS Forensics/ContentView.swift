@@ -8,17 +8,22 @@
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+  @State var preferredColumn = NavigationSplitViewColumn.content
+  var body: some View {
+    NavigationSplitView(preferredCompactColumn: $preferredColumn ) {
+      LeftView()
+    } content: {
+      MainView()
+    } detail: {
+      RightView()
     }
+
+    
 }
 
-#Preview {
-    ContentView()
+  
 }
+//  What you don't see, forensics
+//
+//  Copyright Almahdi Morris Quet 2024
+//
