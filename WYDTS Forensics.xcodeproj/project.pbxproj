@@ -14,6 +14,10 @@
 		340EAFA42C4C475A00698795 /* LeftView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAFA32C4C475A00698795 /* LeftView.swift */; };
 		340EAFA62C4C47A400698795 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAFA52C4C47A400698795 /* MainView.swift */; };
 		340EAFA82C4C47D700698795 /* RightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340EAFA72C4C47D700698795 /* RightView.swift */; };
+		34B3D5062C4F4487003943BF /* SRGAN.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34B3D5052C4F4487003943BF /* SRGAN.mlmodel */; };
+		34B3D5082C4F4DA2003943BF /* NightStyle.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34B3D5072C4F4DA2003943BF /* NightStyle.mlmodel */; };
+		34B3D5102C4F9F92003943BF /* Image2redhue.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34B3D50F2C4F9F92003943BF /* Image2redhue.mlmodel */; };
+		34B3D5122C4FA244003943BF /* Image2dark.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34B3D5112C4FA244003943BF /* Image2dark.mlmodel */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +31,10 @@
 		340EAFA32C4C475A00698795 /* LeftView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftView.swift; sourceTree = "<group>"; };
 		340EAFA52C4C47A400698795 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		340EAFA72C4C47D700698795 /* RightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RightView.swift; sourceTree = "<group>"; };
+		34B3D5052C4F4487003943BF /* SRGAN.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = SRGAN.mlmodel; sourceTree = "<group>"; };
+		34B3D5072C4F4DA2003943BF /* NightStyle.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = NightStyle.mlmodel; sourceTree = "<group>"; };
+		34B3D50F2C4F9F92003943BF /* Image2redhue.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = Image2redhue.mlmodel; sourceTree = "<group>"; };
+		34B3D5112C4FA244003943BF /* Image2dark.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = Image2dark.mlmodel; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,8 +73,12 @@
 				340EAFA52C4C47A400698795 /* MainView.swift */,
 				340EAFA72C4C47D700698795 /* RightView.swift */,
 				340EAF952C4BC4E300698795 /* Assets.xcassets */,
+				34B3D5072C4F4DA2003943BF /* NightStyle.mlmodel */,
 				340EAF932C4BC4E200698795 /* Main.swift */,
 				340EAF9A2C4BC4E300698795 /* WYDTS_Forensics.entitlements */,
+				34B3D5052C4F4487003943BF /* SRGAN.mlmodel */,
+				34B3D5112C4FA244003943BF /* Image2dark.mlmodel */,
+				34B3D50F2C4F9F92003943BF /* Image2redhue.mlmodel */,
 				340EAF972C4BC4E300698795 /* Preview Content */,
 			);
 			path = "WYDTS Forensics";
@@ -152,8 +164,12 @@
 			files = (
 				340EAFA22C4C447F00698795 /* ContentView.swift in Sources */,
 				340EAFA62C4C47A400698795 /* MainView.swift in Sources */,
+				34B3D5122C4FA244003943BF /* Image2dark.mlmodel in Sources */,
+				34B3D5082C4F4DA2003943BF /* NightStyle.mlmodel in Sources */,
 				340EAFA82C4C47D700698795 /* RightView.swift in Sources */,
 				340EAFA42C4C475A00698795 /* LeftView.swift in Sources */,
+				34B3D5102C4F9F92003943BF /* Image2redhue.mlmodel in Sources */,
+				34B3D5062C4F4487003943BF /* SRGAN.mlmodel in Sources */,
 				340EAF942C4BC4E200698795 /* Main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
