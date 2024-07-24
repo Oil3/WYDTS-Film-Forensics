@@ -7,11 +7,12 @@ import Vision
 
 struct MainView: View {
   @State private var videoURL: URL?
-  @State private var ciContext = CIContext()
+  private let ciContext = CIContext()
   @State private var selectedFilter: CIFilter?
-  @State private var mlModel: MLModel?
+  @State private var mlModel: VNCoreMLModel?
   @State private var applyFilter = false
   @State private var applyMLModel = false
+  @State private var applyPostMLFilters = false
   @State private var brightness: CGFloat = 0.0
   @State private var contrast: CGFloat = 1.0
   @State private var saturation: CGFloat = 1.0
@@ -39,8 +40,8 @@ struct MainView: View {
   @State private var gallery: [NSImage] = []
   @State private var putAsideFrame = false
   @AppStorage("filterPreset") private var filterPresetData: Data?
-  private var  model = try? Image2redhue().model
-
+  private var model = try? Image2redhue().model
+  
   let filters = ["Original", "CIDocumentEnhancer", "CIColorHistogram"]
   
   var body: some View {
@@ -79,6 +80,7 @@ struct MainView: View {
       }
       Toggle("Apply Filter", isOn: $applyFilter)
       Toggle("Apply CoreML Model", isOn: $applyMLModel)
+      Toggle("Apply Post-ML Filters", isOn: $applyPostMLFilters)
       let mlName = model?.modelDescription.metadata[.description] as? String ?? "None"
       Text("Model: \(mlName)")
       Spacer()
@@ -99,13 +101,13 @@ struct MainView: View {
   private var videoPlayerView: some View {
     ZStack {
       if let playerView = playerView {
-        CoreVideoPlayerView(videoURL: $videoURL, applyFilter: $applyFilter, selectedFilter: $selectedFilter, applyMLModel: $applyMLg, mlModel: $mlModel, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, player: $player, playerView: $playerView, ciContext: $ciContext, showOverlay: $showOverlay, putAsideFrame: $putAsideFrame, gallery: $gallery)
-          .frame(minWidth: 640, maxWidth: .infinity, minHeight: 480, maxHeight: .infinity)
+        CoreVideoPlayerView(videoURL: $videoURL, applyFilter: $applyFilter, selectedFilter: $selectedFilter, applyMLModel: $applyMLModel, applyPostMLFilters: $applyPostMLFilters, mlModel: $mlModel, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, player: $player, playerView: $playerView, ciContext: .constant(ciContext), showOverlay: $showOverlay, putAsideFrame: $putAsideFrame, gallery: $gallery)
+          .frame(minWidth: 640, maxWidth: 1980, minHeight: 480, maxHeight: 1980)
       } else {
         VStack {
           Rectangle()
             .stroke(Color.gray, lineWidth: 2)
-            .frame(minWidth: 640, maxWidth: .infinity, minHeight: 480, maxHeight: .infinity)
+            .frame(minWidth: 640, maxWidth: 1980, minHeight: 480, maxHeight: 1980)
             .background(Color.black)
             .overlay(
               Text("Load a video to start")
@@ -123,7 +125,7 @@ struct MainView: View {
       Slider(value: $brightness, in: -1...1, step: 0.1) {
         Text("Brightness")
       }
-      .onChange(of: brightness) { newValue in
+      .onChange(of: brightness) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -131,7 +133,7 @@ struct MainView: View {
       Slider(value: $contrast, in: 0...4, step: 0.1) {
         Text("Contrast")
       }
-      .onChange(of: contrast) { newValue in
+      .onChange(of: contrast) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -139,13 +141,13 @@ struct MainView: View {
       Slider(value: $saturation, in: 0...4, step: 0.1) {
         Text("Saturation")
       }
-      .onChange(of: saturation) { newValue in
+      .onChange(of: saturation) {
         applyCurrentFilters()
       }
       Slider(value: $inputEV, in: -2...2, step: 0.1) {
         Text("Exposure")
       }
-      .onChange(of: inputEV) { newValue in
+      .onChange(of: inputEV) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -153,7 +155,7 @@ struct MainView: View {
       Slider(value: $gamma, in: 0.1...3.0, step: 0.1) {
         Text("Gamma")
       }
-      .onChange(of: gamma) { newValue in
+      .onChange(of: gamma) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -161,7 +163,7 @@ struct MainView: View {
       Slider(value: $hue, in: 0...2 * .pi, step: 0.1) {
         Text("Hue")
       }
-      .onChange(of: hue) { newValue in
+      .onChange(of: hue) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -169,7 +171,7 @@ struct MainView: View {
       Slider(value: $highlightAmount, in: 0...1, step: 0.1) {
         Text("Highlight")
       }
-      .onChange(of: highlightAmount) { newValue in
+      .onChange(of: highlightAmount) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -177,7 +179,7 @@ struct MainView: View {
       Slider(value: $shadowAmount, in: -1...1, step: 0.1) {
         Text("Shadows")
       }
-      .onChange(of: shadowAmount) { newValue in
+      .onChange(of: shadowAmount) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -185,7 +187,7 @@ struct MainView: View {
       Slider(value: $temperature, in: 1000...10000, step: 100) {
         Text("Temperature")
       }
-      .onChange(of: temperature) { newValue in
+      .onChange(of: temperature) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -193,7 +195,7 @@ struct MainView: View {
       Slider(value: $tint, in: -200...200, step: 1) {
         Text("Tint")
       }
-      .onChange(of: tint) { newValue in
+      .onChange(of: tint) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -201,55 +203,55 @@ struct MainView: View {
       Slider(value: $whitePoint, in: 0...2, step: 0.1) {
         Text("White Point")
       }
-      .onChange(of: whitePoint) { newValue in
+      .onChange(of: whitePoint) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
       }
       Toggle("CIColorInvert", isOn: $invert)
-        .onChange(of: invert) { newValue in
+        .onChange(of: invert) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIColorPosterize", isOn: $posterize)
-        .onChange(of: posterize) { newValue in
+        .onChange(of: posterize) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CISharpenLuminance", isOn: $sharpenLuminance)
-        .onChange(of: sharpenLuminance) { newValue in
+        .onChange(of: sharpenLuminance) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIUnsharpMask", isOn: $unsharpMask)
-        .onChange(of: unsharpMask) { newValue in
+        .onChange(of: unsharpMask) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIEdges", isOn: $edges)
-        .onChange(of: edges) { newValue in
+        .onChange(of: edges) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIGaborGradients", isOn: $gaborGradients)
-        .onChange(of: gaborGradients) { newValue in
+        .onChange(of: gaborGradients) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIColorClamp", isOn: $colorClamp)
-        .onChange(of: colorClamp) { newValue in
+        .onChange(of: colorClamp) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIConvolution3x3", isOn: $convolution3x3)
-        .onChange(of: convolution3x3) { newValue in
+        .onChange(of: convolution3x3) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
@@ -289,7 +291,7 @@ struct MainView: View {
   
   private func chooseVideo() {
     let panel = NSOpenPanel()
-    panel.allowedFileTypes = ["mp4", "mov"]
+    panel.allowedContentTypes = [.movie]
     if panel.runModal() == .OK {
       videoURL = panel.url
       setupPlayer()
@@ -298,139 +300,210 @@ struct MainView: View {
   
   private func chooseModel() {
     let panel = NSOpenPanel()
-    panel.allowedFileTypes = ["mlmodel"]
+    panel.allowedContentTypes = []
     if panel.runModal() == .OK {
-      do {
-        let url = panel.url
-        let compiledModelURL = try? MLModel.compileModel(at: url!)
-        mlModel = try MLModel(contentsOf: compiledModelURL!)
-      } catch {
-        print("Error loading CoreML model: \(error)")
+      DispatchQueue.global(qos: .default).async {
+        do {
+          let url = panel.url
+          let compiledModelURL = try MLModel.compileModel(at: url!)
+          let model = try MLModel(contentsOf: compiledModelURL)
+          let coreMLModel = try VNCoreMLModel(for: model)
+          DispatchQueue.main.async {
+            mlModel = coreMLModel
+            applyCurrentFilters()
+          }
+        } catch {
+          print("Error loading CoreML model: \(error)")
+        }
       }
     }
-    applyCurrentFilters()
+  }
+  
+  private func setupVideoComposition(for asset: AVAsset, playerItem: AVPlayerItem) {
+    let videoComposition = AVVideoComposition(asset: asset) { request in
+      let ciImage = request.sourceImage
+      
+      // Ensure the output image matches the composition render size
+      let renderSize = request.renderSize
+      let aspectRatio = ciImage.extent.size.width / ciImage.extent.size.height
+      let scaledHeight = renderSize.width / aspectRatio
+      
+      let scaledImage = ciImage.transformed(by: CGAffineTransform(scaleX: renderSize.width / ciImage.extent.size.width,
+                                                                  y: scaledHeight / ciImage.extent.size.height))
+      
+      // Center the image within the render size
+      let offsetY = (renderSize.height - scaledHeight) / 2
+      let centeredImage = scaledImage.transformed(by: CGAffineTransform(translationX: 0, y: offsetY))
+      Task {
+
+        let processedImage = await self.applyFilters(to: centeredImage, with: asset)
+      
+      request.finish(with: processedImage, context: self.ciContext)
+    }
+    }
+    playerItem.videoComposition = videoComposition
   }
   
   private func applyCurrentFilters() {
     guard let player = player, let playerItem = player.currentItem else { return }
     
     playerItem.videoComposition = AVVideoComposition(asset: playerItem.asset) { request in
-      var ciImage = request.sourceImage.clampedToExtent()
-      ciImage = self.applyFilters(to: ciImage)
-      request.finish(with: ciImage, context: self.ciContext)
+      let ciImage = request.sourceImage
+      Task {
+
+      let processedImage = await self.applyFilters(to: ciImage, with: playerItem.asset)
+      request.finish(with: processedImage, context: self.ciContext)
     }
+      }
     
     // Explicitly reset the video composition if the player is paused
     if player.rate == 0 {
-      playerItem.videoComposition = playerItem.videoComposition
+      setupVideoComposition(for: playerItem.asset, playerItem: playerItem)
     }
   }
   
-  private func applyFilters(to image: CIImage) -> CIImage {
+  private func applyFilters(to image: CIImage, with asset: AVAsset) async -> CIImage {
     var ciImage = image
     
     if applyMLModel {
-        let modelDescription = model!.modelDescription
-//        guard let inputDescription = modelDescription.inputDescriptionsByName["image"],
-//              let inputConstraint = inputDescription.imageConstraint else {
-//          return ciImage
-//        }
-      let mlFilter = CIFilter(name: "CICoreMLModelFilter")!
-        mlFilter.setValue(model, forKey: "inputModel")
-        mlFilter.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = mlFilter.outputImage!        
-        // Apply affine transform to adjust the plane
+      ciImage = await applyCoreMLModel(to: ciImage, with: asset)
     }
-
-    if applyFilter {
+    
+    if applyFilter || applyPostMLFilters {
       if let selectedFilter = selectedFilter {
         selectedFilter.setValue(ciImage, forKey: kCIInputImageKey)
         ciImage = selectedFilter.outputImage ?? ciImage
       }
       
-      if invert {
-        let filter = CIFilter(name: "CIColorInvert")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      if posterize {
-        let filter = CIFilter(name: "CIColorPosterize")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      if sharpenLuminance {
-        let filter = CIFilter(name: "CISharpenLuminance")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      if unsharpMask {
-        let filter = CIFilter(name: "CIUnsharpMask")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      if edges {
-        let filter = CIFilter(name: "CIEdges")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      if gaborGradients {
-        let filter = CIFilter(name: "CIGaborGradients")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      if colorClamp {
-        let filter = CIFilter(name: "CIColorClamp")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      if convolution3x3 {
-        let filter = CIFilter(name: "CIConvolution3X3")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        ciImage = filter?.outputImage ?? ciImage
-      }
-      
-      let colorControlsFilter = CIFilter(name: "CIColorControls")
-      colorControlsFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-      colorControlsFilter?.setValue(brightness, forKey: kCIInputBrightnessKey)
-      colorControlsFilter?.setValue(contrast, forKey: kCIInputContrastKey)
-      colorControlsFilter?.setValue(saturation, forKey: kCIInputSaturationKey)
-      ciImage = colorControlsFilter?.outputImage ?? ciImage
-      
-      let gammaFilter = CIFilter(name: "CIGammaAdjust")
-      gammaFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-      gammaFilter?.setValue(gamma, forKey: "inputPower")
-      ciImage = gammaFilter?.outputImage ?? ciImage
-      
-      let hueFilter = CIFilter(name: "CIHueAdjust")
-      hueFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-      hueFilter?.setValue(hue, forKey: kCIInputAngleKey)
-      ciImage = hueFilter?.outputImage ?? ciImage
-      
-      let highlightShadowFilter = CIFilter(name: "CIHighlightShadowAdjust")
-      highlightShadowFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-      highlightShadowFilter?.setValue(highlightAmount, forKey: "inputHighlightAmount")
-      highlightShadowFilter?.setValue(shadowAmount, forKey: "inputShadowAmount")
-      ciImage = highlightShadowFilter?.outputImage ?? ciImage
-      
-      let temperatureAndTintFilter = CIFilter(name: "CITemperatureAndTint")
-      temperatureAndTintFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-      temperatureAndTintFilter?.setValue(CIVector(x: temperature, y: tint), forKey: "inputNeutral")
-      ciImage = temperatureAndTintFilter?.outputImage ?? ciImage
-      
-      let whitePointAdjustFilter = CIFilter(name: "CIWhitePointAdjust")
-      whitePointAdjustFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-      whitePointAdjustFilter?.setValue(CIColor(red: whitePoint, green: whitePoint, blue: whitePoint), forKey: kCIInputColorKey)
-      ciImage = whitePointAdjustFilter?.outputImage ?? ciImage
+      ciImage = applyAdditionalFilters(to: ciImage)
     }
     
     return ciImage
+  }
+  
+  private func applyAdditionalFilters(to image: CIImage) -> CIImage {
+    var ciImage = image
+    
+    if invert {
+      let filter = CIFilter(name: "CIColorInvert")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    if posterize {
+      let filter = CIFilter(name: "CIColorPosterize")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    if sharpenLuminance {
+      let filter = CIFilter(name: "CISharpenLuminance")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    if unsharpMask {
+      let filter = CIFilter(name: "CIUnsharpMask")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    if edges {
+      let filter = CIFilter(name: "CIEdges")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    if gaborGradients {
+      let filter = CIFilter(name: "CIGaborGradients")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    if colorClamp {
+      let filter = CIFilter(name: "CIColorClamp")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    if convolution3x3 {
+      let filter = CIFilter(name: "CIConvolution3X3")
+      filter?.setValue(ciImage, forKey: kCIInputImageKey)
+      ciImage = filter?.outputImage ?? ciImage
+    }
+    
+    let colorControlsFilter = CIFilter(name: "CIColorControls")
+    colorControlsFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+    colorControlsFilter?.setValue(brightness, forKey: kCIInputBrightnessKey)
+    colorControlsFilter?.setValue(contrast, forKey: kCIInputContrastKey)
+    colorControlsFilter?.setValue(saturation, forKey: kCIInputSaturationKey)
+    ciImage = colorControlsFilter?.outputImage ?? ciImage
+    
+    let gammaFilter = CIFilter(name: "CIGammaAdjust")
+    gammaFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+    gammaFilter?.setValue(gamma, forKey: "inputPower")
+    ciImage = gammaFilter?.outputImage ?? ciImage
+    
+    let hueFilter = CIFilter(name: "CIHueAdjust")
+    hueFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+    hueFilter?.setValue(hue, forKey: kCIInputAngleKey)
+    ciImage = hueFilter?.outputImage ?? ciImage
+    
+    let highlightShadowFilter = CIFilter(name: "CIHighlightShadowAdjust")
+    highlightShadowFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+    highlightShadowFilter?.setValue(highlightAmount, forKey: "inputHighlightAmount")
+    highlightShadowFilter?.setValue(shadowAmount, forKey: "inputShadowAmount")
+    ciImage = highlightShadowFilter?.outputImage ?? ciImage
+    
+    let temperatureAndTintFilter = CIFilter(name: "CITemperatureAndTint")
+    temperatureAndTintFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+    temperatureAndTintFilter?.setValue(CIVector(x: temperature, y: tint), forKey: "inputNeutral")
+    ciImage = temperatureAndTintFilter?.outputImage ?? ciImage
+    
+    let whitePointAdjustFilter = CIFilter(name: "CIWhitePointAdjust")
+    whitePointAdjustFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+    whitePointAdjustFilter?.setValue(CIColor(red: whitePoint, green: whitePoint, blue: whitePoint), forKey: kCIInputColorKey)
+    ciImage = whitePointAdjustFilter?.outputImage ?? ciImage
+    
+    return ciImage
+  }
+  
+  private func applyCoreMLModel(to ciImage: CIImage, with asset: AVAsset) async -> CIImage {
+    guard let mlModel = mlModel else { return ciImage }
+    
+    var outputCIImage: CIImage?
+    
+    let videoTrack = try? await asset.loadTracks(withMediaType: .video).first
+    let videoSize = try? await videoTrack?.load(.naturalSize) ?? CGSize(width: 1080, height: 1080)
+    
+    let pixelBuffer = pixelBufferFromImage(ciImage: ciImage, size: videoSize ?? CGSize(width: 1080, height: 1080))
+    let request = VNCoreMLRequest(model: mlModel) { request, error in
+      if let results = request.results as? [VNPixelBufferObservation],
+         let observation = results.first {
+        outputCIImage = CIImage(cvPixelBuffer: observation.pixelBuffer)
+      }
+    }
+    request.imageCropAndScaleOption = .scaleFit
+    let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+    try? handler.perform([request])
+    
+    return outputCIImage ?? ciImage.clampedToExtent()
+  }
+  
+  private func pixelBufferFromImage(ciImage: CIImage, size: CGSize) -> CVPixelBuffer {
+    let width = Int(size.width)
+    let height = Int(size.height)
+    
+    var pixelBuffer: CVPixelBuffer?
+    let attrs = [
+      kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+      kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue
+    ] as CFDictionary
+    CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
+    
+    ciContext.render(ciImage, to: pixelBuffer!)
+    
+    return pixelBuffer!
   }
   
   private func resetFilters() {
@@ -516,14 +589,13 @@ struct MainView: View {
     playerView?.player = player
     playerView?.allowsMagnification = true
     playerView?.allowsVideoFrameAnalysis = false
+    playerView?.videoGravity = .resizeAspect
+    playerView?.allowsPictureInPicturePlayback = true
+    playerView?.showsFullScreenToggleButton = true
+    playerView?.showsFrameSteppingButtons = true
+    playerView?.controlsStyle = .floating
     
-    let videoComposition = AVVideoComposition(asset: asset) { request in
-      var ciImage = request.sourceImage.clampedToExtent()
-      ciImage = self.applyFilters(to: ciImage)
-      request.finish(with: ciImage, context: self.ciContext)
-    }
-    
-    playerItem.videoComposition = videoComposition
+    setupVideoComposition(for: asset, playerItem: playerItem)
   }
   
   private func putAsideCurrentFrame() {
@@ -544,7 +616,8 @@ struct CoreVideoPlayerView: NSViewRepresentable {
   @Binding var applyFilter: Bool
   @Binding var selectedFilter: CIFilter?
   @Binding var applyMLModel: Bool
-  @Binding var mlModel: MLModel?
+  @Binding var applyPostMLFilters: Bool
+  @Binding var mlModel: VNCoreMLModel?
   @Binding var brightness: CGFloat
   @Binding var contrast: CGFloat
   @Binding var saturation: CGFloat
