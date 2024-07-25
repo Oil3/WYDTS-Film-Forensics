@@ -353,14 +353,16 @@ struct MainView: View {
     let panel = NSOpenPanel()
     panel.allowedContentTypes = []
     if panel.runModal() == .OK {
-      DispatchQueue.global(qos: .default).async {
+      DispatchQueue.main.async {
         do {
           let url = panel.url
           let compiledModelURL = try MLModel.compileModel(at: url!)
           let model = try MLModel(contentsOf: compiledModelURL)
           let coreMLModel = try VNCoreMLModel(for: model)
-          DispatchQueue.main.async {
+          DispatchQueue.global(qos: .default).async {
             mlModel = coreMLModel
+            createPixelBufferPool()
+
             applyCurrentFilters()
           }
         } catch {
@@ -427,7 +429,16 @@ struct MainView: View {
       showFilteredGalleryImage = false
     }
   }
-
+  private func createPixelBufferPool() {
+    var attributes: [String: Any] = [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+      kCVPixelBufferWidthKey as String: playerView?.player?.currentItem?.presentationSize.width,
+      kCVPixelBufferHeightKey as String: playerView?.player?.currentItem?.presentationSize.height,
+      kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+    ]
+    
+    CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, attributes as CFDictionary, &pixelBufferPool)
+  }
   private func applyCurrentFilters() {
     guard let player = player, let playerItem = player.currentItem else { return }
     
@@ -566,11 +577,16 @@ struct MainView: View {
   }
   
   private func applyCoreMLModel(to ciImage: CIImage) -> CIImage {
-    guard let mlModel = mlModel else { return ciImage }
-    
-    var outputCIImage: CIImage?
+    guard let mlModel = mlModel, var pixelBufferPool = pixelBufferPool else { return ciImage }
 
-  let pixelBuffer = pixelBufferFromImage(ciImage: ciImage)
+    var outputCIImage: CIImage?
+    var pixelBuffer: CVPixelBuffer?
+let videoSize = playerView?.player?.currentItem?.presentationSize
+//  let pixelBuffer = pixelBufferFromImage(ciImage: ciImage)
+    let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelBufferPool, &pixelBuffer)
+    guard status == kCVReturnSuccess, var pixelBuffer = pixelBuffer else { return ciImage }
+    ciContext.render(ciImage, to: pixelBuffer)
+
   let vnRequest = VNCoreMLRequest(model: mlModel) { vnRequest, error in
     if let results = vnRequest.results as? [VNPixelBufferObservation],
        let observation = results.first {
@@ -585,8 +601,8 @@ struct MainView: View {
 }
 
 private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
-  let width = Int((playerView?.videoBounds.width)!)
-  let height = Int((playerView?.videoBounds.height)!)
+  let width = Int((playerView?.player?.currentItem?.presentationSize.width)!)//Int((playerView?.videoBounds.width)!)
+  let height = Int((playerView?.player?.currentItem?.presentationSize.height)!)//Int((playerView?.videoBounds.height)!)
   
   var pixelBuffer: CVPixelBuffer?
   let attrs = [
@@ -694,6 +710,8 @@ private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
   }
   
   private func setupPlayer() {
+//    createPixelBufferPool()
+
     guard let videoURL = videoURL else { return }
     let asset = AVAsset(url: videoURL)
     let playerItem = AVPlayerItem(asset: asset)
@@ -909,8 +927,9 @@ struct CoreVideoPlayerView: NSViewRepresentable {
       let ciImage = CIImage(contentsOf: gallery[selectedIndex].url)!
       Image(nsImage: convertCIImageToNSImage(ciImage: ciImage))
         .resizable()
-        .scaledToFit()
-        .frame(minWidth: 640, maxWidth: 1980, minHeight: 480, maxHeight: 1980)
+       // .scaledToFit()
+    
+//        .frame(minWidth: 640, maxWidth: 1980, minHeight: 480, maxHeight: 1980)
         .overlay(
           HStack {
             Button(action: previousImage) {
