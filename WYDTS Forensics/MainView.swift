@@ -101,7 +101,8 @@ struct MainView: View {
     ZStack {
       if let playerView = playerView {
         CoreVideoPlayerView(videoURL: $videoURL, applyFilter: $applyFilter, selectedFilter: $selectedFilter, applyMLModel: $applyMLModel, applyPostMLFilters: $applyPostMLFilters, mlModel: $mlModel, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, player: $player, playerView: $playerView, ciContext: .constant(ciContext), showOverlay: $showOverlay, putAsideFrame: $putAsideFrame, gallery: $gallery, selectedGalleryIndex: $selectedGalleryIndex, showFilteredGalleryImage: $showFilteredGalleryImage)
-          .frame(minWidth: 640, maxWidth: 1980, minHeight: 480, maxHeight: 1980)
+          .frame(minWidth: 640, minHeight: 480)
+        .clipped()
       } else {
         VStack {
           Rectangle()
@@ -370,29 +371,24 @@ struct MainView: View {
   }
   
   private func setupVideoComposition(for asset: AVAsset, playerItem: AVPlayerItem) {
-    let videoComposition = AVVideoComposition(asset: asset) { request in
-      let ciImage = request.sourceImage
-      
-      // Ensure the output image matches the composition render size
-      let renderSize = request.renderSize
-      let aspectRatio = ciImage.extent.size.width / ciImage.extent.size.height
-      let scaledHeight = renderSize.width / aspectRatio
-      
-      let scaledImage = ciImage.transformed(by: CGAffineTransform(scaleX: renderSize.width / ciImage.extent.size.width,
-                                                                  y: scaledHeight / ciImage.extent.size.height))
-      
-      // Center the image within the render size
-      let offsetY = (renderSize.height - scaledHeight) / 2
-      let centeredImage = scaledImage.transformed(by: CGAffineTransform(translationX: 0, y: offsetY))
-      Task {
-        
-        let processedImage = await self.applyFilters(to: centeredImage, with: asset)
-        
-        request.finish(with: processedImage, context: self.ciContext)
+    Task {
+      do {
+        let videoComposition = try await AVVideoComposition.videoComposition(with: asset) { request in
+          let ciImage = request.sourceImage.clampedToExtent()
+          var filteredImage = self.applyFilters(to: ciImage)
+          
+          // Apply additional filters if needed
+          filteredImage = self.applyAdditionalFilters(to: filteredImage)
+          
+          request.finish(with: filteredImage, context: self.ciContext)
+        }
+        playerItem.videoComposition = videoComposition
+      } catch {
+        print("Error setting up video composition: \(error)")
       }
     }
-    playerItem.videoComposition = videoComposition
   }
+
   private func showImage() {
     guard let player = player, let playerItem = player.currentItem else { return }
     let currentTime = player.currentTime()
@@ -434,28 +430,37 @@ struct MainView: View {
 
   private func applyCurrentFilters() {
     guard let player = player, let playerItem = player.currentItem else { return }
-    DispatchQueue.global(qos: .userInteractive).async {
-    playerItem.videoComposition = AVVideoComposition(asset: playerItem.asset) { request in
-      let ciImage = request.sourceImage
-      Task {
-        let processedImage = await self.applyFilters(to: ciImage, with: playerItem.asset)
-        request.finish(with: processedImage, context: self.ciContext)
-      }
-    }
     
-    // Explicitly reset the video composition if the player is paused
-    if player.rate == 0 {
-      setupVideoComposition(for: playerItem.asset, playerItem: playerItem)
+    Task {
+      do {
+        let videoComposition = try await AVVideoComposition.videoComposition(with: playerItem.asset) { request in
+          let ciImage = request.sourceImage.clampedToExtent()
+          var filteredImage = self.applyFilters(to: ciImage)
+          
+          // Apply additional filters if needed
+          filteredImage = self.applyAdditionalFilters(to: filteredImage)
+          
+          request.finish(with: filteredImage, context: self.ciContext)
+        }
+        playerItem.videoComposition = videoComposition
+      } catch {
+        print("Error applying current filters: \(error)")
+      }
+//      //might need explicit refresh when paused
+//      if player.rate == 0 {
+//        setupVideoComposition(for: playerItem.asset, playerItem: playerItem)
+//      }
+
+
     }
   }
-    }
-  
-  private func applyFilters(to image: CIImage, with asset: AVAsset) async -> CIImage {
-    var ciImage = image
-    DispatchQueue.global(qos: .userInteractive).async {
 
+  
+  private func applyFilters(to image: CIImage) -> CIImage {
+    var ciImage = image
+    
     if applyMLModel {
-      ciImage = await applyCoreMLModel(to: ciImage, with: asset)
+      ciImage = applyCoreMLModel(to: ciImage)
     }
     
     if applyFilter || applyPostMLFilters {
@@ -463,8 +468,6 @@ struct MainView: View {
         selectedFilter.setValue(ciImage, forKey: kCIInputImageKey)
         ciImage = selectedFilter.outputImage ?? ciImage
       }
-      
-      ciImage = applyAdditionalFilters(to: ciImage)
     }
     
     return ciImage
@@ -561,28 +564,41 @@ struct MainView: View {
     
     return ciImage
   }
-  }
-  private func applyCoreMLModel(to ciImage: CIImage, with asset: AVAsset) async -> CIImage {
+  
+  private func applyCoreMLModel(to ciImage: CIImage) -> CIImage {
     guard let mlModel = mlModel else { return ciImage }
     
     var outputCIImage: CIImage?
-    
-    let videoTrack = try? await asset.loadTracks(withMediaType: .video).first
-    let videoSize = try? await videoTrack?.load(.naturalSize) ?? CGSize(width: 1080, height: 1080)
-    
-    let pixelBuffer = pixelBufferFromImage(ciImage: ciImage, size: videoSize ?? CGSize(width: 1080, height: 1080))
-    let request = VNCoreMLRequest(model: mlModel) { request, error in
-      if let results = request.results as? [VNPixelBufferObservation],
-         let observation = results.first {
-        outputCIImage = CIImage(cvPixelBuffer: observation.pixelBuffer)
-      }
+
+  let pixelBuffer = pixelBufferFromImage(ciImage: ciImage)
+  let vnRequest = VNCoreMLRequest(model: mlModel) { vnRequest, error in
+    if let results = vnRequest.results as? [VNPixelBufferObservation],
+       let observation = results.first {
+      outputCIImage = CIImage(cvPixelBuffer: observation.pixelBuffer)
     }
-    request.imageCropAndScaleOption = .scaleFit
-    let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
-    try? handler.perform([request])
-    
-    return outputCIImage ?? ciImage.clampedToExtent()
   }
+  vnRequest.imageCropAndScaleOption = VNImageCropAndScaleOption.scaleFit
+  let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+  try? handler.perform([vnRequest])
+  
+  return outputCIImage ?? ciImage.clampedToExtent()
+}
+
+private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
+  let width = Int((playerView?.videoBounds.width)!)
+  let height = Int((playerView?.videoBounds.height)!)
+  
+  var pixelBuffer: CVPixelBuffer?
+  let attrs = [
+    kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+    kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue
+  ] as CFDictionary
+  CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
+  
+  ciContext.render(ciImage, to: pixelBuffer!)
+  
+  return pixelBuffer!
+}  
   
   private func pixelBufferFromImage(ciImage: CIImage, size: CGSize) -> CVPixelBuffer {
     let width = Int(size.width)
