@@ -37,10 +37,13 @@ struct MainView: View {
   @State private var showOverlay = false
   @State private var colorClamp = false
   @State private var convolution3x3 = false
-  @State private var gallery: [NSImage] = []
+  @State private var gallery: [GalleryImage] = []
   @State private var putAsideFrame = false
+  @State private var rotateAngle: CGFloat = 0.0
   @AppStorage("filterPreset") private var filterPresetData: Data?
   private var model = try? Image2redhue().model
+  @State private var selectedGalleryIndex: Int?
+  @State private var showFilteredGalleryImage = false
   
   let filters = ["Original", "CIDocumentEnhancer", "CIColorHistogram"]
   
@@ -66,6 +69,7 @@ struct MainView: View {
       Button("Choose Video") {
         chooseVideo()
       }
+      .keyboardShortcut("o", modifiers: .command)
       Button("Choose CoreML Model") {
         chooseModel()
       }
@@ -75,7 +79,7 @@ struct MainView: View {
         }
       }
       .onChange(of: selectedFilterName) { newFilter in
-        selectedFilter = CIFilter(name: newFilter ?? "")
+        selectedFilter = CIFilter(name: newFilter)
         applyCurrentFilters()
       }
       Toggle("Apply Filter", isOn: $applyFilter)
@@ -84,18 +88,13 @@ struct MainView: View {
       let mlName = model?.modelDescription.metadata[.description] as? String ?? "None"
       Text("Model: \(mlName)")
       Spacer()
-      Text("Gallery")
-      ScrollView {
-        ForEach(gallery.indices, id: \.self) { index in
-          Image(nsImage: gallery[index])
-            .resizable()
-            .scaledToFit()
-            .frame(width: 100, height: 100)
-        }
-      }
+//      GalleryView(gallery: $gallery, selectedGalleryIndex: $selectedGalleryIndex, showOverlay: $showOverlay, showFilteredGalleryImage: $showFilteredGalleryImage)
     }
     .padding()
     .frame(width: 200)
+//    .onAppear {
+//      loadGallery()
+//    }
   }
   
   private var videoPlayerView: some View {
@@ -118,11 +117,22 @@ struct MainView: View {
       }
     }
     .padding()
+    .contextMenu {
+      Button("Copy Frame") {
+        copyCurrentFrame()
+      }
+      Button("Save Frame") {
+        saveCurrentFrame()
+      }
+      Button("Save Frame As...") {
+        saveCurrentFrameAs()
+      }
+    }
   }
   
   private var rightColumn: some View {
     VStack {
-      Slider(value: $brightness, in: -1...1, step: 0.1) {
+      Slider(value: $brightness, in: -1...1, step: 0.03) {
         Text("Brightness")
       }
       .onChange(of: brightness) {
@@ -130,7 +140,7 @@ struct MainView: View {
           applyCurrentFilters()
         }
       }
-      Slider(value: $contrast, in: 0...4, step: 0.1) {
+      Slider(value: $contrast, in: 0...5, step: 0.03) {
         Text("Contrast")
       }
       .onChange(of: contrast) {
@@ -259,6 +269,12 @@ struct MainView: View {
       Button("Put Aside Frame") {
         putAsideCurrentFrame()
       }
+      Slider(value: $rotateAngle, in: 0...360, step: 1) {
+        Text("Rotate")
+      }
+      .onChange(of: rotateAngle) {
+        applyCurrentFilters()
+      }
       Spacer()
     }
     .padding()
@@ -285,6 +301,17 @@ struct MainView: View {
         showOverlay = true
       }
       Toggle("Loop", isOn: $loop)
+        .onChange(of: loop) { newValue in
+          player?.actionAtItemEnd = newValue ? .none : .pause
+          if newValue {
+            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player?.currentItem, queue: .main) { _ in
+              player?.seek(to: .zero)
+              player?.play()
+            }
+          } else {
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: player?.currentItem)
+          }
+        }
     }
     .padding()
   }
@@ -335,11 +362,9 @@ struct MainView: View {
       let offsetY = (renderSize.height - scaledHeight) / 2
       let centeredImage = scaledImage.transformed(by: CGAffineTransform(translationX: 0, y: offsetY))
       Task {
-
         let processedImage = await self.applyFilters(to: centeredImage, with: asset)
-      
-      request.finish(with: processedImage, context: self.ciContext)
-    }
+        request.finish(with: processedImage, context: self.ciContext)
+      }
     }
     playerItem.videoComposition = videoComposition
   }
@@ -350,11 +375,10 @@ struct MainView: View {
     playerItem.videoComposition = AVVideoComposition(asset: playerItem.asset) { request in
       let ciImage = request.sourceImage
       Task {
-
-      let processedImage = await self.applyFilters(to: ciImage, with: playerItem.asset)
-      request.finish(with: processedImage, context: self.ciContext)
-    }
+        let processedImage = await self.applyFilters(to: ciImage, with: playerItem.asset)
+        request.finish(with: processedImage, context: self.ciContext)
       }
+    }
     
     // Explicitly reset the video composition if the player is paused
     if player.rate == 0 {
@@ -465,6 +489,11 @@ struct MainView: View {
     whitePointAdjustFilter?.setValue(CIColor(red: whitePoint, green: whitePoint, blue: whitePoint), forKey: kCIInputColorKey)
     ciImage = whitePointAdjustFilter?.outputImage ?? ciImage
     
+    // Apply rotation if needed
+    if rotateAngle != 0 {
+      ciImage = ciImage.transformed(by: CGAffineTransform(rotationAngle: rotateAngle * (.pi / 180)))
+    }
+    
     return ciImage
   }
   
@@ -526,6 +555,7 @@ struct MainView: View {
     gaborGradients = false
     colorClamp = false
     convolution3x3 = false
+    rotateAngle = 0.0
     applyCurrentFilters()
   }
   
@@ -549,7 +579,8 @@ struct MainView: View {
       edges: edges,
       gaborGradients: gaborGradients,
       colorClamp: colorClamp,
-      convolution3x3: convolution3x3
+      convolution3x3: convolution3x3,
+      rotateAngle: rotateAngle
     )
     if let data = try? JSONEncoder().encode(preset) {
       filterPresetData = data
@@ -577,6 +608,7 @@ struct MainView: View {
     gaborGradients = preset.gaborGradients
     colorClamp = preset.colorClamp
     convolution3x3 = preset.convolution3x3
+    rotateAngle = preset.rotateAngle
     applyCurrentFilters()
   }
   
@@ -606,8 +638,67 @@ struct MainView: View {
     generator.appliesPreferredTrackTransform = true
     if let cgImage = try? generator.copyCGImage(at: currentTime, actualTime: nil) {
       let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-      gallery.append(nsImage)
+      let url = saveImageToDisk(nsImage: nsImage)
+      let galleryImage = GalleryImage(url: url, index: gallery.count, filters: FilterPreset(
+        brightness: brightness,
+        contrast: contrast,
+        saturation: saturation,
+        inputEV: inputEV,
+        gamma: gamma,
+        hue: hue,
+        highlightAmount: highlightAmount,
+        shadowAmount: shadowAmount,
+        temperature: temperature,
+        tint: tint,
+        whitePoint: whitePoint,
+        invert: invert,
+        posterize: posterize,
+        sharpenLuminance: sharpenLuminance,
+        unsharpMask: unsharpMask,
+        edges: edges,
+        gaborGradients: gaborGradients,
+        colorClamp: colorClamp,
+        convolution3x3: convolution3x3,
+        rotateAngle: rotateAngle
+      ))
+      gallery.append(galleryImage)
+      saveGallery()
     }
+  }
+  
+  private func copyCurrentFrame() {
+    // Implement logic to copy the current frame
+  }
+  
+  private func saveCurrentFrame() {
+    // Implement logic to save the current frame
+  }
+  
+  private func saveCurrentFrameAs() {
+    // Implement logic to save the current frame as...
+  }
+  
+  private func saveImageToDisk(nsImage: NSImage) -> URL {
+    let imageData = nsImage.tiffRepresentation!
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("tiff")
+    try? imageData.write(to: fileURL)
+    return fileURL
+  }
+  
+  func loadGallery() {
+    guard let data = try? Data(contentsOf: galleryFileURL()), let loadedGallery = try? JSONDecoder().decode([GalleryImage].self, from: data) else {
+      return
+    }
+    gallery = loadedGallery
+  }
+  
+  private func saveGallery() {
+    let data = try? JSONEncoder().encode(gallery)
+    try? data?.write(to: galleryFileURL())
+  }
+  
+  private func galleryFileURL() -> URL {
+    return FileManager.default.temporaryDirectory.appendingPathComponent("gallery.json")
   }
 }
 
@@ -642,7 +733,7 @@ struct CoreVideoPlayerView: NSViewRepresentable {
   @Binding var ciContext: CIContext
   @Binding var showOverlay: Bool
   @Binding var putAsideFrame: Bool
-  @Binding var gallery: [NSImage]
+  @Binding var gallery: [GalleryImage]
   
   func makeNSView(context: Context) -> NSView {
     let view = NSView()
@@ -663,8 +754,56 @@ struct CoreVideoPlayerView: NSViewRepresentable {
       playerView.bottomAnchor.constraint(equalTo: nsView.bottomAnchor)
     ])
     
-    if showOverlay, let player = player, player.rate == 0 {
-      // Add overlay logic here
+    if showOverlay, let player = player, player.rate == 0, let selectedIndex = selectedIndex {
+        let ciImage = gallery[selectedIndex].ciImage
+        Image(nsImage: convertCIImageToNSImage(ciImage: ciImage))
+          .resizable()
+          .scaledToFit()
+          .frame(minWidth: 640, maxWidth: 1980, minHeight: 480, maxHeight: 1980)
+          .overlay(
+            HStack {
+              Button(action: previousImage) {
+                Image(systemName: "arrow.left.circle.fill")
+                  .font(.largeTitle)
+                  .padding()
+              }
+              Spacer()
+              Button(action: nextImage) {
+                Image(systemName: "arrow.right.circle.fill")
+                  .font(.largeTitle)
+                  .padding()
+              }
+            }
+              .padding()
+              .background(Color.black.opacity(0.5))
+          )
+      }  }
+}
+
+struct GalleryView: View {
+  @Binding var gallery: [GalleryImage]
+  @Binding var selectedGalleryIndex: Int?
+  @Binding var showOverlay: Bool
+  @Binding var showFilteredGalleryImage: Bool
+  
+  var body: some View {
+    VStack {
+      Text("Gallery")
+      ScrollView {
+        ForEach(gallery.indices, id: \.self) { index in
+          let galleryImage = gallery[index]
+          let nsImage = NSImage(contentsOf: galleryImage.url)!
+          Image(nsImage: nsImage)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 100, height: 100)
+            .onTapGesture {
+              selectedGalleryIndex = index
+              showOverlay = true
+            }
+        }
+      }
+      .frame(height: 200)
     }
   }
 }
@@ -689,6 +828,19 @@ struct FilterPreset: Codable {
   let gaborGradients: Bool
   let colorClamp: Bool
   let convolution3x3: Bool
+  let rotateAngle: CGFloat
 }
+
+struct GalleryImage: Codable, Identifiable {
+  let id = UUID()
+  let url: URL
+  let index: Int
+  let filters: FilterPreset
+}
+
+// What you don't see, forensics
+// Copyright Almahdi Morris Quet 2024
+
+
 // What you don't see, forensics
 // Copyright Almahdi Morris Quet 2024
