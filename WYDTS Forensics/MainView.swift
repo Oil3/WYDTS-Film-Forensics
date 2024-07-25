@@ -154,15 +154,19 @@ struct MainView: View {
       Slider(value: $brightness, in: -1...1, step: 0.03) {
         Text("Brightness")
       }
-      .onChange(of: brightness) { _ in
+      .onChange(of: brightness) {
         if player?.rate == 0 {
           applyCurrentFilters()
+        }
+        if showFilteredGalleryImage {
+          applyCurrentFilters()
+
         }
       }
       Slider(value: $contrast, in: 0...5, step: 0.03) {
         Text("Contrast")
       }
-      .onChange(of: contrast) { _ in
+      .onChange(of: contrast) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -170,13 +174,13 @@ struct MainView: View {
       Slider(value: $saturation, in: 0...4, step: 0.1) {
         Text("Saturation")
       }
-      .onChange(of: saturation) { _ in
+      .onChange(of: saturation) {
         applyCurrentFilters()
       }
       Slider(value: $inputEV, in: -2...2, step: 0.1) {
         Text("Exposure")
       }
-      .onChange(of: inputEV) { _ in
+      .onChange(of: inputEV) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -184,7 +188,7 @@ struct MainView: View {
       Slider(value: $gamma, in: 0.1...3.0, step: 0.1) {
         Text("Gamma")
       }
-      .onChange(of: gamma) { _ in
+      .onChange(of: gamma) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -192,7 +196,7 @@ struct MainView: View {
       Slider(value: $hue, in: 0...2 * .pi, step: 0.1) {
         Text("Hue")
       }
-      .onChange(of: hue) { _ in
+      .onChange(of: hue) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -200,7 +204,7 @@ struct MainView: View {
       Slider(value: $highlightAmount, in: 0...1, step: 0.1) {
         Text("Highlight")
       }
-      .onChange(of: highlightAmount) { _ in
+      .onChange(of: highlightAmount) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -208,7 +212,7 @@ struct MainView: View {
       Slider(value: $shadowAmount, in: -1...1, step: 0.1) {
         Text("Shadows")
       }
-      .onChange(of: shadowAmount) { _ in
+      .onChange(of: shadowAmount) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -216,7 +220,7 @@ struct MainView: View {
       Slider(value: $temperature, in: 1000...10000, step: 100) {
         Text("Temperature")
       }
-      .onChange(of: temperature) { _ in
+      .onChange(of: temperature) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -224,7 +228,7 @@ struct MainView: View {
       Slider(value: $tint, in: -200...200, step: 1) {
         Text("Tint")
       }
-      .onChange(of: tint) { _ in
+      .onChange(of: tint) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
@@ -232,55 +236,55 @@ struct MainView: View {
       Slider(value: $whitePoint, in: 0...2, step: 0.1) {
         Text("White Point")
       }
-      .onChange(of: whitePoint) { _ in
+      .onChange(of: whitePoint) {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
       }
       Toggle("CIColorInvert", isOn: $invert)
-        .onChange(of: invert) { _ in
+        .onChange(of: invert) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIColorPosterize", isOn: $posterize)
-        .onChange(of: posterize) { _ in
+        .onChange(of: posterize) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CISharpenLuminance", isOn: $sharpenLuminance)
-        .onChange(of: sharpenLuminance) { _ in
+        .onChange(of: sharpenLuminance) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIUnsharpMask", isOn: $unsharpMask)
-        .onChange(of: unsharpMask) { _ in
+        .onChange(of: unsharpMask) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIEdges", isOn: $edges)
-        .onChange(of: edges) { _ in
+        .onChange(of: edges) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIGaborGradients", isOn: $gaborGradients)
-        .onChange(of: gaborGradients) { _ in
+        .onChange(of: gaborGradients) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIColorClamp", isOn: $colorClamp)
-        .onChange(of: colorClamp) { _ in
+        .onChange(of: colorClamp) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
         }
       Toggle("CIConvolution3x3", isOn: $convolution3x3)
-        .onChange(of: convolution3x3) { _ in
+        .onChange(of: convolution3x3) {
           if player?.rate == 0 {
             applyCurrentFilters()
           }
@@ -291,7 +295,7 @@ struct MainView: View {
       Slider(value: $rotateAngle, in: 0...360, step: 1) {
         Text("Rotate")
       }
-      .onChange(of: rotateAngle) { _ in
+      .onChange(of: rotateAngle) {
         applyCurrentFilters()
       }
       Spacer()
@@ -430,7 +434,7 @@ struct MainView: View {
 
   private func applyCurrentFilters() {
     guard let player = player, let playerItem = player.currentItem else { return }
-    
+    DispatchQueue.global(qos: .userInteractive).async {
     playerItem.videoComposition = AVVideoComposition(asset: playerItem.asset) { request in
       let ciImage = request.sourceImage
       Task {
@@ -444,10 +448,12 @@ struct MainView: View {
       setupVideoComposition(for: playerItem.asset, playerItem: playerItem)
     }
   }
+    }
   
   private func applyFilters(to image: CIImage, with asset: AVAsset) async -> CIImage {
     var ciImage = image
-    
+    DispatchQueue.global(qos: .userInteractive).async {
+
     if applyMLModel {
       ciImage = await applyCoreMLModel(to: ciImage, with: asset)
     }
@@ -555,7 +561,7 @@ struct MainView: View {
     
     return ciImage
   }
-  
+  }
   private func applyCoreMLModel(to ciImage: CIImage, with asset: AVAsset) async -> CIImage {
     guard let mlModel = mlModel else { return ciImage }
     
