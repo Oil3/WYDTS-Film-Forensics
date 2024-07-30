@@ -6,7 +6,7 @@ import AVKit
 import Vision
 
 struct MainView: View {
-  @State private var videoURL: URL? = Bundle.main.url(forResource: "matrix", withExtension: "mov")
+  @State private var videoURL: URL?
   private let ciContext = CIContext()
   @State private var selectedFilter: CIFilter?
   @State private var mlModel: VNCoreMLModel?
@@ -43,11 +43,13 @@ struct MainView: View {
   @State private var selectedGalleryIndex: Int? = nil
   @State private var showFilteredGalleryImage = false
   @State private var isImageOverlayVisible = false
+  @State private var mainComparisonImage: CIImage? // Main image for comparison
   @AppStorage("filterPreset") private var filterPresetData: Data?
   private var model = try? Image2redhue().model
   @State private var pixelBufferPool: CVPixelBufferPool?
   @State var selectedSize: CGSize = CGSize(width: 1024, height: 576)
   @State private var replacePlayerWithOverlay = false
+  @State private var pixelComparison = false
 
   let filters = ["Original", "CIDocumentEnhancer", "CIColorHistogram"]
   
@@ -59,6 +61,7 @@ struct MainView: View {
         ScrollView {
           videoPlayerView
           controlButtons
+          comparisonControls
         }
       }
     }, detail: {
@@ -67,10 +70,18 @@ struct MainView: View {
     })
     .navigationSplitViewStyle(.balanced)
     .onAppear(perform: loadGallery)
-    .onAppear(perform: setupPlayer)
-
   }
-  
+  private var comparisonControls: some View {
+    VStack {
+      Toggle("Apply Pixel Comparison", isOn: $pixelComparison)
+      Button("Apply Pixel Comparison") {
+        if pixelComparison {
+          applyPixelComparison()
+        }
+      }
+      .disabled(!pixelComparison || mainComparisonImage == nil)
+    }
+    }
   private var leftColumn: some View {
     VStack(alignment: .leading) {
       Button("Choose Video") {
@@ -86,7 +97,7 @@ struct MainView: View {
         Menu("Select Size") {
           Button("640x640") { selectedSize = CGSize(width: 640, height: 640) }
           Button("1024x576") { selectedSize = CGSize(width: 1024, height: 576) }
-          Button("576x1024") { selectedSize = CGSize(width: 540, height: 960) }
+          Button("576x1024") { selectedSize = CGSize(width: 576, height: 1024) }
           Button("1280x720") { selectedSize = CGSize(width: 1280, height: 720) }
         }
       }
@@ -105,7 +116,7 @@ struct MainView: View {
       let mlName = model?.modelDescription.metadata[.description] as? String ?? "None"
       Text("Model: \(mlName)")
       Spacer()
-      GalleryView(gallery: $gallery, selectedGalleryIndex: $selectedGalleryIndex, showOverlay: $showOverlay, showFilteredGalleryImage: $showFilteredGalleryImage, isImageOverlayVisible: $isImageOverlayVisible)
+      GalleryView(gallery: $gallery, selectedGalleryIndex: $selectedGalleryIndex, showOverlay: $showOverlay, showFilteredGalleryImage: $showFilteredGalleryImage, isImageOverlayVisible: $isImageOverlayVisible, mainComparisonImage: $mainComparisonImage)
     }
     .padding()
     .frame(width: 200)
@@ -113,44 +124,37 @@ struct MainView: View {
   
   private var videoPlayerView: some View {
     ZStack {
-      if replacePlayerWithOverlay {
-        if isImageOverlayVisible, let selectedIndex = selectedGalleryIndex {
-          let ciImage = CIImage(contentsOf: gallery[selectedIndex].url)!
-          ResizableDraggableImageView(ciImage: ciImage, applyFilter: $applyFilter, selectedFilter: $selectedFilter, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, showFilteredGalleryImage: $showFilteredGalleryImage, isImageOverlayVisible: $isImageOverlayVisible, replacePlayerWithOverlay: $replacePlayerWithOverlay)
-        }
+      if let playerView = playerView {
+        CoreVideoPlayerView(videoURL: $videoURL, applyFilter: $applyFilter, selectedFilter: $selectedFilter, applyMLModel: $applyMLModel, applyPostMLFilters: $applyPostMLFilters, mlModel: $mlModel, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, player: $player, playerView: $playerView, ciContext: .constant(ciContext), showOverlay: $showOverlay, putAsideFrame: $putAsideFrame, gallery: $gallery, selectedGalleryIndex: $selectedGalleryIndex, showFilteredGalleryImage: $showFilteredGalleryImage)
+          .frame(minWidth:480, idealWidth: selectedSize.width, minHeight: 480, idealHeight: selectedSize.height)
       } else {
-        if let playerView = playerView {
-          CoreVideoPlayerView(/*videoURL: $videoURL, */applyFilter: $applyFilter, selectedFilter: $selectedFilter, applyMLModel: $applyMLModel, applyPostMLFilters: $applyPostMLFilters, mlModel: $mlModel, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, player: $player, playerView: $playerView, ciContext: .constant(ciContext), showOverlay: $showOverlay, putAsideFrame: $putAsideFrame, gallery: $gallery, selectedGalleryIndex: $selectedGalleryIndex, showFilteredGalleryImage: $showFilteredGalleryImage)
-            .frame(minWidth: 480, idealWidth: selectedSize.width, minHeight: 480, idealHeight: selectedSize.height)
-        } else {
-          VStack {
-            Rectangle()
-              .stroke(Color.gray, lineWidth: 2)
-              .frame(width: selectedSize.width, height: selectedSize.height)
-              .background(Color.black)
-              .overlay(
-                Text("Load a video to start")
-                  .foregroundColor(.white)
-              )
-              .padding()
-              .contextMenu {
-                Button("Copy Frame") {
-                  copyCurrentFrame()
-                }
-                Button("Save Frame") {
-                  saveCurrentFrame()
-                }
-                Button("Show Image") {
-                  showImage()
-                }
+        VStack {
+          Rectangle()
+            .stroke(Color.gray, lineWidth: 2)
+            .frame(width: selectedSize.width, height: selectedSize.height)
+            .background(Color.black)
+            .overlay(
+              Text("Load a video to start")
+                .foregroundColor(.white)
+            )
+            .padding()
+            .contextMenu {
+              Button("Copy Frame") {
+                copyCurrentFrame()
               }
-          }
+              Button("Save Frame") {
+                saveCurrentFrame()
+              }
+              Button("Show Image") {
+                showImage()
+              }
+            }
         }
       }
       
-      if !replacePlayerWithOverlay && isImageOverlayVisible, let selectedIndex = selectedGalleryIndex {
+      if isImageOverlayVisible, let selectedIndex = selectedGalleryIndex {
         let ciImage = CIImage(contentsOf: gallery[selectedIndex].url)!
-        ResizableDraggableImageView(ciImage: ciImage, applyFilter: $applyFilter, selectedFilter: $selectedFilter, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, showFilteredGalleryImage: $showFilteredGalleryImage, isImageOverlayVisible: $isImageOverlayVisible, replacePlayerWithOverlay: $replacePlayerWithOverlay)
+        ResizableDraggableImageView(ciImage: ciImage, applyFilter: $applyFilter, selectedFilter: $selectedFilter, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, showFilteredGalleryImage: $showFilteredGalleryImage, isImageOverlayVisible: $isImageOverlayVisible, replacePlayerWithOverlay: $replacePlayerWithOverlay, mainComparisonImage: $mainComparisonImage)
       }
     }
     .padding()
@@ -168,13 +172,12 @@ struct MainView: View {
   }
   
   private var rightColumn: some View {
-
     VStack {
       Toggle("Apply Filters to Video", isOn: $applyFilter)
       Toggle("Apply Filters to Image", isOn: $showFilteredGalleryImage)
       Toggle("Show Overlay", isOn: $isImageOverlayVisible)
       Toggle("Replace Video Player with Overlay", isOn: $replacePlayerWithOverlay)
-
+      
       Slider(value: $brightness, in: -1...1, step: 0.03) {
         Text("Brightness")
       }
@@ -182,10 +185,6 @@ struct MainView: View {
         if player?.rate == 0 {
           applyCurrentFilters()
         }
-//        if showFilteredGalleryImage {
-//          applyCurrentFilters()
-////
-//        }
       }
       Slider(value: $contrast, in: 0...5, step: 0.03) {
         Text("Contrast")
@@ -341,11 +340,9 @@ struct MainView: View {
       }
       Button("Play") {
         player?.play()
-//        showOverlay = false
       }
       Button("Pause") {
         player?.pause()
-//        showOverlay = true
       }
       Toggle("Loop", isOn: $loop)
         .onChange(of: loop) { newValue in
@@ -379,17 +376,14 @@ struct MainView: View {
       do {
         let url = panel.url
         let compiledModelURL = try? MLModel.compileModel(at: url!)
-      let model = try? MLModel(contentsOf: compiledModelURL!)
+        let model = try? MLModel(contentsOf: compiledModelURL!)
         let coreMLModel = try? VNCoreMLModel(for: model!)
-          mlModel = coreMLModel
-          //            createPixelBufferPool()
-          
-          applyCurrentFilters()
-        
-        
+        mlModel = coreMLModel
+        applyCurrentFilters()
       }
     }
   }
+  
   private func setupVideoComposition(for asset: AVAsset, playerItem: AVPlayerItem) {
     Task {
       do {
@@ -408,7 +402,7 @@ struct MainView: View {
       }
     }
   }
-
+  
   fileprivate func showImage() {
     guard let player = player, let playerItem = player.currentItem else { return }
     let currentTime = player.currentTime()
@@ -447,6 +441,7 @@ struct MainView: View {
       showFilteredGalleryImage = false
     }
   }
+  
   private func createPixelBufferPool() {
     let attributes: [String: Any] = [
       kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -457,6 +452,7 @@ struct MainView: View {
     
     CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, attributes as CFDictionary, &pixelBufferPool)
   }
+  
   private func applyCurrentFilters() {
     guard let player = player, let playerItem = player.currentItem else { return }
     
@@ -472,18 +468,9 @@ struct MainView: View {
       } catch {
         print("Error applying current filters: \(error)")
       }
-      
-//      // Apply filters to the selected gallery image if showFilteredGalleryImage is true
-//      if showFilteredGalleryImage, let selectedIndex = selectedGalleryIndex {
-//        let galleryImage = gallery[selectedIndex]
-//        if let nsImage = NSImage(contentsOf: galleryImage.url), let ciImage = convertNSImageToCIImage(nsImage: nsImage) {
-//          let filteredImage = self.applyFilters(to: ciImage)
-//          // Replace the existing gallery image with the filtered one
-//          gallery[selectedIndex] = GalleryImage(url: saveImageToDisk(nsImage: convertCIImageToNSImage(ciImage: filteredImage)), index: selectedIndex, filters: galleryImage.filters)
-//        }
-//      }
     }
   }
+  
   private func convertNSImageToCIImage(nsImage: NSImage) -> CIImage? {
     guard let tiffData = nsImage.tiffRepresentation else { return nil }
     guard let bitmapImage = NSBitmapImageRep(data: tiffData) else { return nil }
@@ -507,7 +494,7 @@ struct MainView: View {
     
     return ciImage
   }
-
+  
   private func applyAdditionalFilters(to image: CIImage) -> CIImage {
     var ciImage = image
     
@@ -602,57 +589,41 @@ struct MainView: View {
   
   private func applyCoreMLModel(to ciImage: CIImage) -> CIImage {
     guard let mlModel = mlModel, let pixelBufferPool = pixelBufferPool else { return ciImage }
-
+    
     var outputCIImage: CIImage?
     var pixelBuffer: CVPixelBuffer?
     let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelBufferPool, &pixelBuffer)
     guard status == kCVReturnSuccess, var pixelBuffer = pixelBuffer else { return ciImage }
     ciContext.render(ciImage, to: pixelBuffer)
-
-  let vnRequest = VNCoreMLRequest(model: mlModel) { vnRequest, error in
-    if let results = vnRequest.results as? [VNPixelBufferObservation],
-       let observation = results.first {
-      outputCIImage = CIImage(cvPixelBuffer: observation.pixelBuffer)
+    
+    let vnRequest = VNCoreMLRequest(model: mlModel) { vnRequest, error in
+      if let results = vnRequest.results as? [VNPixelBufferObservation],
+         let observation = results.first {
+        outputCIImage = CIImage(cvPixelBuffer: observation.pixelBuffer)
+      }
     }
+    vnRequest.imageCropAndScaleOption = VNImageCropAndScaleOption.scaleFit
+    let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+    try? handler.perform([vnRequest])
+    
+    return outputCIImage ?? ciImage.clampedToExtent()
   }
-  vnRequest.imageCropAndScaleOption = VNImageCropAndScaleOption.scaleFit
-  let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
-  try? handler.perform([vnRequest])
   
-  return outputCIImage ?? ciImage.clampedToExtent()
-}
-
-private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
-  let width = Int((playerView?.player?.currentItem?.presentationSize.width)!)//Int((playerView?.videoBounds.width)!)
-  let height = Int((playerView?.player?.currentItem?.presentationSize.height)!)//Int((playerView?.videoBounds.height)!)
-  
-  var pixelBuffer: CVPixelBuffer?
-  let attrs = [
-    kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
-    kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue
-  ] as CFDictionary
-  CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
-  
-  ciContext.render(ciImage, to: pixelBuffer!)
-  
-  return pixelBuffer!
-}  
-  
-//  private func pixelBufferFromImage(ciImage: CIImage, size: CGSize) -> CVPixelBuffer {
-//    let width = Int(size.width)
-//    let height = Int(size.height)
-//    
-//    var pixelBuffer: CVPixelBuffer?
-//    let attrs = [
-//      kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
-//      kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue
-//    ] as CFDictionary
-//    CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
-//    
-//    ciContext.render(ciImage, to: pixelBuffer!)
-//    
-//    return pixelBuffer!
-//  }
+  private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
+    let width = Int((playerView?.player?.currentItem?.presentationSize.width)!)
+    let height = Int((playerView?.player?.currentItem?.presentationSize.height)!)
+    
+    var pixelBuffer: CVPixelBuffer?
+    let attrs = [
+      kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+      kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue
+    ] as CFDictionary
+    CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
+    
+    ciContext.render(ciImage, to: pixelBuffer!)
+    
+    return pixelBuffer!
+  }
   
   private func resetFilters() {
     brightness = 0.0
@@ -679,7 +650,6 @@ private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
   }
   
   private func savePreset() {
-    
     let preset = FilterPreset(
       brightness: brightness,
       contrast: contrast,
@@ -734,7 +704,7 @@ private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
   
   private func setupPlayer() {
     createPixelBufferPool()
-
+    
     guard let videoURL = videoURL else { return }
     let asset = AVAsset(url: videoURL)
     let playerItem = AVPlayerItem(asset: asset)
@@ -789,7 +759,7 @@ private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
       saveGallery()
     }
   }
-
+  
   private func saveImageToDisk(nsImage: NSImage) -> URL {
     let fileManager = FileManager.default
     let urls = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -889,7 +859,7 @@ private func pixelBufferFromImage(ciImage: CIImage) -> CVPixelBuffer {
 }
 
 struct CoreVideoPlayerView: NSViewRepresentable {
-  @State private var videoURL: URL? = Bundle.main.url(forResource: "matrix", withExtension: "mov")
+  @Binding var videoURL: URL?
   @Binding var applyFilter: Bool
   @Binding var selectedFilter: CIFilter?
   @Binding var applyMLModel: Bool
@@ -927,7 +897,6 @@ struct CoreVideoPlayerView: NSViewRepresentable {
     let view = NSView()
     view.wantsLayer = true
     return view
-    
   }
   
   func updateNSView(_ nsView: NSView, context: Context) {
@@ -954,8 +923,8 @@ struct CoreVideoPlayerView: NSViewRepresentable {
                 .font(.largeTitle)
                 .padding()
             }
-              .keyboardShortcut(.leftArrow)
-
+            .keyboardShortcut(.leftArrow)
+            
             Spacer()
             Button(action: nextImage) {
               Image(systemName: "arrow.right.circle.fill")
@@ -968,7 +937,7 @@ struct CoreVideoPlayerView: NSViewRepresentable {
         )
     }
   }
-
+  
   private func convertCIImageToNSImage(ciImage: CIImage) -> NSImage {
     let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent)
     return NSImage(cgImage: cgImage!, size: NSSize(width: ciImage.extent.width, height: ciImage.extent.height))
@@ -1022,8 +991,9 @@ struct GalleryView: View {
   @Binding var selectedGalleryIndex: Int?
   @Binding var showOverlay: Bool
   @Binding var showFilteredGalleryImage: Bool
-  @Binding var isImageOverlayVisible: Bool //= false
-
+  @Binding var isImageOverlayVisible: Bool
+  @Binding var mainComparisonImage: CIImage?
+  
   var body: some View {
     VStack {
       Text("Gallery")
@@ -1031,43 +1001,42 @@ struct GalleryView: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))]) {
           if gallery.isEmpty {
             Text("No images")
-            //              .foregroundColor(.gray)
-//              .frame(maxWidth: .infinity, maxHeight: .infinity)
           } else {
-                ForEach(gallery.indices, id: \.self) { index in
-                  if let ciImage = CIImage(contentsOf: gallery[index].url) {
-                    Image(nsImage: convertCIImageToNSImage(ciImage: ciImage))
-                      .resizable()
-                      .scaledToFit()
-                      .frame(width: 100, height: 58)
-                      .onTapGesture(count: 2) {
-                        selectedGalleryIndex = index
-                        showOverlay = true
-                        showFilteredGalleryImage = false
-                        isImageOverlayVisible = true
-
-                      }
-                      .contextMenu {
-                        Button("Copy Frame") {
-                          MainView().copyCurrentFrame()
-                        }
-                        Button("Save Frame") {
-                          MainView().saveCurrentFrame()
-                        }
-                        Button("Show Image") {
-                          MainView().showImage()
-                        }
-                        Button("Remove Picture") {
-                          removePicture(at: index)
-                        }
-                        Button("Clear All") {
-                          clearAllPictures()
-                        }
-                      }
+            ForEach(gallery.indices, id: \.self) { index in
+              if let ciImage = CIImage(contentsOf: gallery[index].url) {
+                Image(nsImage: convertCIImageToNSImage(ciImage: ciImage))
+                  .resizable()
+                  .scaledToFit()
+                  .frame(width: 100, height: 58)
+                  .onTapGesture(count: 2) {
+                    selectedGalleryIndex = index
+                    showOverlay = true
+                    showFilteredGalleryImage = false
+                    isImageOverlayVisible = true
+                    mainComparisonImage = ciImage
                   }
-                }
+                  .contextMenu {
+                    Button("Copy Frame") {
+                      MainView().copyCurrentFrame()
+                    }
+                    Button("Save Frame") {
+                      MainView().saveCurrentFrame()
+                    }
+                    Button("Show Image") {
+                      MainView().showImage()
+                    }
+                    Button("Remove Picture") {
+                      removePicture(at: index)
+                    }
+                    Button("Clear All") {
+                      showOverlay = false
+                      isImageOverlayVisible = false
+                      clearAllPictures()
+                    }
+                  }
+              }
+            }
           }
-
         }
         .padding()
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
@@ -1083,8 +1052,9 @@ struct GalleryView: View {
           return true
         }
       }
-}
- }
+    }
+  }
+  
   private func convertCIImageToNSImage(ciImage: CIImage) -> NSImage {
     let ciContext = CIContext()
     let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent)!
@@ -1131,6 +1101,7 @@ struct GalleryView: View {
     let urls = fileManager.urls(for: .documentDirectory, in: .userDomainMask)
     return urls[0].appendingPathComponent("gallery.json")
   }
+  
   private func removePicture(at index: Int) {
     gallery.remove(at: index)
     saveGallery()
@@ -1172,7 +1143,8 @@ struct ResizableDraggableImageView: View {
   @State private var rotateBy = Angle(degrees: 0.0)
   @Binding var isImageOverlayVisible: Bool
   @Binding var replacePlayerWithOverlay: Bool
-
+  @Binding var mainComparisonImage: CIImage?
+  
   var magnification: some Gesture {
     MagnifyGesture()
       .updating($magnifyBy) { value, gestureState, transaction in
@@ -1182,7 +1154,6 @@ struct ResizableDraggableImageView: View {
         size.width *= value.magnification
         size.height = size.width * (ciImage.extent.height / ciImage.extent.width)
       }
-
   }
   var rotation: some Gesture {
     RotateGesture()
@@ -1198,13 +1169,12 @@ struct ResizableDraggableImageView: View {
       if showFilteredGalleryImage {
         Image(nsImage: convertCIImageToNSImage(ciImage: applyFilters(to: ciImage)))
           .resizable()
-        
           .scaledToFit()
           .scaleEffect(magnifyBy)
           .gesture(magnification)
           .rotationEffect(rotateBy)
           .gesture(rotation)
-        .frame(width: size.width, height: size.height)
+          .frame(width: size.width, height: size.height)
           .offset(x: position.width, y: position.height)
           .gesture(
             DragGesture()
@@ -1212,11 +1182,7 @@ struct ResizableDraggableImageView: View {
                 self.position = value.translation
               }
           )
-
       } else {
-      //      if showFilteredGalleryImage {
-      //        Image(nsImage: convertCIImageToNSImage(ciImage: applyFilters(to: ciImage)))
-
         Image(nsImage: convertCIImageToNSImage(ciImage: ciImage))
           .resizable()
           .scaledToFit()
@@ -1224,7 +1190,6 @@ struct ResizableDraggableImageView: View {
           .gesture(magnification)
           .rotationEffect(rotateBy)
           .gesture(rotation)
-
           .frame(width: size.width, height: size.height)
           .offset(x: position.width, y: position.height)
           .gesture(
@@ -1235,16 +1200,13 @@ struct ResizableDraggableImageView: View {
           )
       }
     }
-    .frame(width: (MainView().selectedSize.width), height: MainView().selectedSize.height)
+    .frame(width: MainView().selectedSize.width, height: MainView().selectedSize.height)
     .contextMenu {
       Button("Close Overlay") {
         isImageOverlayVisible = false
       }
       .keyboardShortcut(.escape)
-      
-
     }
-
   }
   
   private func applyFilters(to image: CIImage) -> CIImage {
@@ -1336,11 +1298,6 @@ struct ResizableDraggableImageView: View {
       whitePointAdjustFilter?.setValue(ciImage, forKey: kCIInputImageKey)
       whitePointAdjustFilter?.setValue(CIColor(red: whitePoint, green: whitePoint, blue: whitePoint), forKey: kCIInputColorKey)
       ciImage = whitePointAdjustFilter?.outputImage ?? ciImage
-      
-      // Apply rotation if needed
-      //            if rotateAngle != 0 {
-      //                ciImage = ciImage.transformed(by: CGAffineTransform(rotationAngle: rotateAngle * (.pi / 180)))
-      //            }
     }
     
     return ciImage
@@ -1351,6 +1308,45 @@ struct ResizableDraggableImageView: View {
     let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent)!
     let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     return nsImage
+  }
+}
+
+// New functions for pixel comparison
+extension MainView {
+  func comparePixels(image1: CIImage, image2: CIImage) -> CIImage? {
+    let filter = CIFilter(name: "CIBlendWithMask")
+    filter?.setValue(image1, forKey: kCIInputImageKey)
+    filter?.setValue(image2, forKey: kCIInputBackgroundImageKey)
+    filter?.setValue(maskForComparison(image1: image1, image2: image2), forKey: kCIInputMaskImageKey)
+    return filter?.outputImage
+  }
+  
+  func maskForComparison(image1: CIImage, image2: CIImage) -> CIImage? {
+    let filter = CIFilter(name: "CIDifferenceBlendMode")
+    filter?.setValue(image1, forKey: kCIInputImageKey)
+    filter?.setValue(image2, forKey: kCIInputBackgroundImageKey)
+    return filter?.outputImage
+  }
+  
+  func applyPixelComparison() {
+    guard let mainImage = mainComparisonImage else { return }
+    guard let player = player, let playerItem = player.currentItem else { return }
+    
+    Task {
+      do {
+        let videoComposition = try await AVVideoComposition.videoComposition(with: playerItem.asset) { request in
+          let ciImage = request.sourceImage.clampedToExtent()
+          var filteredImage = self.applyFilters(to: ciImage)
+          if let comparisonResult = self.comparePixels(image1: mainImage, image2: filteredImage) {
+            filteredImage = comparisonResult
+          }
+          request.finish(with: filteredImage, context: self.ciContext)
+        }
+        playerItem.videoComposition = videoComposition
+      } catch {
+        print("Error setting up video composition: \(error)")
+      }
+    }
   }
 }
 //
