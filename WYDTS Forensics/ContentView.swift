@@ -16,6 +16,8 @@ struct ContentView: View {
       MainView()
     } detail: {
       RightView()
+        .navigationSplitViewColumnWidth(0)
+
     }
     .navigationSplitViewStyle(.balanced)
 

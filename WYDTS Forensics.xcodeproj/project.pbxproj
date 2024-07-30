@@ -20,6 +20,7 @@
 		34B3D5122C4FA244003943BF /* Image2dark.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34B3D5112C4FA244003943BF /* Image2dark.mlmodel */; };
 		34B3D5142C4FBA90003943BF /* img2imgCheckFlexibleShape.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34B3D5132C4FBA90003943BF /* img2imgCheckFlexibleShape.mlmodel */; };
 		34B3D5162C500841003943BF /* CoreMLfliter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34B3D5152C500841003943BF /* CoreMLfliter.swift */; };
+		34BE4E5F2C54AC89009B07EA /* matrix.mov in Resources */ = {isa = PBXBuildFile; fileRef = 34BE4E5E2C54AC89009B07EA /* matrix.mov */; };
 		34C574B62C512D580089B0F9 /* SRGAN_with_preprocessing.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34C574B52C512D580089B0F9 /* SRGAN_with_preprocessing.mlmodel */; };
 		34C574B82C512D640089B0F9 /* Zero-DCE.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34C574B72C512D640089B0F9 /* Zero-DCE.mlmodel */; };
 		34C574BA2C513A2C0089B0F9 /*     isImageOverlayVisible = true .mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 34C574B92C513A2B0089B0F9 /*     isImageOverlayVisible = true .mlmodel */; };
@@ -42,6 +43,7 @@
 		34B3D5112C4FA244003943BF /* Image2dark.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = Image2dark.mlmodel; sourceTree = "<group>"; };
 		34B3D5132C4FBA90003943BF /* img2imgCheckFlexibleShape.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = img2imgCheckFlexibleShape.mlmodel; sourceTree = "<group>"; };
 		34B3D5152C500841003943BF /* CoreMLfliter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreMLfliter.swift; sourceTree = "<group>"; };
+		34BE4E5E2C54AC89009B07EA /* matrix.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = matrix.mov; sourceTree = "<group>"; };
 		34C574B52C512D580089B0F9 /* SRGAN_with_preprocessing.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = SRGAN_with_preprocessing.mlmodel; sourceTree = "<group>"; };
 		34C574B72C512D640089B0F9 /* Zero-DCE.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = "Zero-DCE.mlmodel"; sourceTree = "<group>"; };
 		34C574B92C513A2B0089B0F9 /*     isImageOverlayVisible = true .mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = "    isImageOverlayVisible = true .mlmodel"; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 				34C574B92C513A2B0089B0F9 /*     isImageOverlayVisible = true .mlmodel */,
 				34C574B52C512D580089B0F9 /* SRGAN_with_preprocessing.mlmodel */,
 				34C574B72C512D640089B0F9 /* Zero-DCE.mlmodel */,
+				34BE4E5E2C54AC89009B07EA /* matrix.mov */,
 				340EAF972C4BC4E300698795 /* Preview Content */,
 			);
 			path = "WYDTS Forensics";
@@ -165,6 +168,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				34BE4E5F2C54AC89009B07EA /* matrix.mov in Resources */,
 				340EAF992C4BC4E300698795 /* Preview Assets.xcassets in Resources */,
 				340EAF962C4BC4E300698795 /* Assets.xcassets in Resources */,
 			);
