@@ -43,13 +43,16 @@ struct MainView: View {
   @State private var selectedGalleryIndex: Int? = nil
   @State private var showFilteredGalleryImage = false
   @State private var isImageOverlayVisible = false
-  @State private var mainComparisonImage: CIImage? // Main image for comparison
   @AppStorage("filterPreset") private var filterPresetData: Data?
   private var model = try? Image2redhue().model
   @State private var pixelBufferPool: CVPixelBufferPool?
   @State var selectedSize: CGSize = CGSize(width: 1024, height: 576)
   @State private var replacePlayerWithOverlay = false
   @State private var pixelComparison = false
+  @State private var mainComparisonImage: CIImage? // Main image for comparison
+  @State private var comparisonMode: ComparisonMode = .specificImage
+  @State private var threshold: CGFloat = 0.1
+  @State private var comparisonColor: Color = .black
 
   let filters = ["Original", "CIDocumentEnhancer", "CIColorHistogram"]
   
@@ -74,6 +77,23 @@ struct MainView: View {
   private var comparisonControls: some View {
     VStack {
       Toggle("Apply Pixel Comparison", isOn: $pixelComparison)
+      
+      Picker("Comparison Mode", selection: $comparisonMode) {
+        Text("Specific Image").tag(ComparisonMode.specificImage)
+        Text("Sequential").tag(ComparisonMode.sequential)
+      }
+      .pickerStyle(SegmentedPickerStyle())
+      
+      // Threshold Slider
+      Slider(value: $threshold, in: 0.0...1.0) {
+        Text("Threshold")
+      }
+      .padding()
+      
+      // Color Picker for Comparison Color
+      ColorPicker("Comparison Color", selection: $comparisonColor)
+        .padding()
+      
       Button("Apply Pixel Comparison") {
         if pixelComparison {
           applyPixelComparison()
@@ -153,7 +173,7 @@ struct MainView: View {
       }
       
       if isImageOverlayVisible, let selectedIndex = selectedGalleryIndex {
-        let ciImage = CIImage(contentsOf: gallery[selectedIndex].url)!
+        var ciImage = CIImage(contentsOf: gallery[selectedIndex].url)!
         ResizableDraggableImageView(ciImage: ciImage, applyFilter: $applyFilter, selectedFilter: $selectedFilter, brightness: $brightness, contrast: $contrast, saturation: $saturation, inputEV: $inputEV, gamma: $gamma, hue: $hue, highlightAmount: $highlightAmount, shadowAmount: $shadowAmount, temperature: $temperature, tint: $tint, whitePoint: $whitePoint, invert: $invert, posterize: $posterize, sharpenLuminance: $sharpenLuminance, unsharpMask: $unsharpMask, edges: $edges, gaborGradients: $gaborGradients, colorClamp: $colorClamp, convolution3x3: $convolution3x3, showFilteredGalleryImage: $showFilteredGalleryImage, isImageOverlayVisible: $isImageOverlayVisible, replacePlayerWithOverlay: $replacePlayerWithOverlay, mainComparisonImage: $mainComparisonImage)
       }
     }
@@ -178,7 +198,7 @@ struct MainView: View {
       Toggle("Show Overlay", isOn: $isImageOverlayVisible)
       Toggle("Replace Video Player with Overlay", isOn: $replacePlayerWithOverlay)
       
-      Slider(value: $brightness, in: -1...1, step: 0.03) {
+      Slider(value: $brightness, in: -1...1, step: 0.02) {
         Text("Brightness")
       }
       .onChange(of: brightness) {
@@ -186,7 +206,7 @@ struct MainView: View {
           applyCurrentFilters()
         }
       }
-      Slider(value: $contrast, in: 0...5, step: 0.03) {
+      Slider(value: $contrast, in: -10...10, step: 0.02) {
         Text("Contrast")
       }
       .onChange(of: contrast) {
@@ -194,7 +214,7 @@ struct MainView: View {
           applyCurrentFilters()
         }
       }
-      Slider(value: $saturation, in: 0...4, step: 0.1) {
+      Slider(value: $saturation, in: -1...4, step: 0.02) {
         Text("Saturation")
       }
       .onChange(of: saturation) {
@@ -208,7 +228,7 @@ struct MainView: View {
           applyCurrentFilters()
         }
       }
-      Slider(value: $gamma, in: 0.1...3.0, step: 0.1) {
+      Slider(value: $gamma, in: -1...3.0, step: 0.02) {
         Text("Gamma")
       }
       .onChange(of: gamma) {
@@ -224,7 +244,7 @@ struct MainView: View {
           applyCurrentFilters()
         }
       }
-      Slider(value: $highlightAmount, in: 0...1, step: 0.1) {
+      Slider(value: $highlightAmount, in: -1...2, step: 0.02) {
         Text("Highlight")
       }
       .onChange(of: highlightAmount) {
@@ -313,7 +333,8 @@ struct MainView: View {
           }
         }
       Button("Put Aside Frame") {
-        putAsideCurrentFrame()
+          putAsideCurrentFrame()
+        
       }
       Slider(value: $rotateAngle, in: 0...360, step: 1) {
         Text("Rotate")
@@ -359,7 +380,41 @@ struct MainView: View {
     }
     .padding()
   }
-  
+  private func applyPixelComparison() {
+    guard let player = player, let playerItem = player.currentItem else { return }
+    let asset = playerItem.asset
+    let generator = AVAssetImageGenerator(asset: asset)
+    generator.appliesPreferredTrackTransform = true
+    
+    let duration = asset.duration
+    let framesCount = Int(duration.seconds * 30) // Assuming 30 FPS
+    
+    if comparisonMode == .specificImage {
+      guard let mainImage = mainComparisonImage else { return }
+      for frame in 0..<framesCount {
+        let time = CMTime(seconds: Double(frame) / 30.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
+          let ciImage = CIImage(cgImage: cgImage)
+          let comparedImage = compareImages(mainImage: mainImage, frameImage: ciImage)
+          // Save or display comparedImage
+        }
+      }
+    } else {
+      var previousImage: CIImage?
+      for frame in 0..<framesCount {
+        let time = CMTime(seconds: Double(frame) / 30.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
+          let ciImage = CIImage(cgImage: cgImage)
+          if let prevImage = previousImage {
+            let comparedImage = compareImages(mainImage: prevImage, frameImage: ciImage)
+            // Save or display comparedImage
+          }
+          previousImage = ciImage
+        }
+      }
+    }
+  }
+
   private func chooseVideo() {
     let panel = NSOpenPanel()
     panel.allowedContentTypes = [.movie]
@@ -409,6 +464,8 @@ struct MainView: View {
     let asset = playerItem.asset
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
+    generator.requestedTimeToleranceAfter = .zero //no tolerance to get exact frame
+    generator.requestedTimeToleranceBefore = .zero //no tolerance to get exact frame
     if let cgImage = try? generator.copyCGImage(at: currentTime, actualTime: nil) {
       let ciImage = CIImage(cgImage: cgImage)
       let filters = FilterPreset(
@@ -728,8 +785,10 @@ struct MainView: View {
     let asset = playerItem.asset
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
+    generator.requestedTimeToleranceAfter = .zero //no tolerance in order to get exact frame
+    generator.requestedTimeToleranceBefore = .zero //no tolerance in order to get exact frame
     if let cgImage = try? generator.copyCGImage(at: currentTime, actualTime: nil) {
-      let ciImage = CIImage(cgImage: cgImage)
+//      let ciImage = CIImage(cgImage: cgImage)
       let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
       let url = saveImageToDisk(nsImage: nsImage)
       let filters = FilterPreset(
@@ -1182,25 +1241,26 @@ struct ResizableDraggableImageView: View {
                 self.position = value.translation
               }
           )
-      } else {
-        Image(nsImage: convertCIImageToNSImage(ciImage: ciImage))
-          .resizable()
-          .scaledToFit()
-          .scaleEffect(magnifyBy)
-          .gesture(magnification)
-          .rotationEffect(rotateBy)
-          .gesture(rotation)
-          .frame(width: size.width, height: size.height)
-          .offset(x: position.width, y: position.height)
-          .gesture(
-            DragGesture()
-              .onChanged { value in
-                self.position = value.translation
-              }
-          )
+//      } else {
+//        Image(nsImage: convertCIImageToNSImage(ciImage: ciImage))
+//          .resizable()
+//          .scaledToFit()
+//          .scaleEffect(magnifyBy)
+//          .gesture(magnification)
+//          .rotationEffect(rotateBy)
+//          .gesture(rotation)
+//          .frame(width: size.width, height: size.height)
+//          .offset(x: position.width, y: position.height)
+//          .gesture(
+//            DragGesture()
+//              .onChanged { value in
+//                self.position = value.translation
+//              }
+//          )
       }
     }
     .frame(width: MainView().selectedSize.width, height: MainView().selectedSize.height)
+    
     .contextMenu {
       Button("Close Overlay") {
         isImageOverlayVisible = false
@@ -1311,8 +1371,13 @@ struct ResizableDraggableImageView: View {
   }
 }
 
-// New functions for pixel comparison
+// Pixel comparison
+
 extension MainView {
+  enum ComparisonMode {
+    case specificImage
+    case sequential
+  }
   func comparePixels(image1: CIImage, image2: CIImage) -> CIImage? {
     let filter = CIFilter(name: "CIBlendWithMask")
     filter?.setValue(image1, forKey: kCIInputImageKey)
@@ -1328,26 +1393,59 @@ extension MainView {
     return filter?.outputImage
   }
   
-  func applyPixelComparison() {
-    guard let mainImage = mainComparisonImage else { return }
-    guard let player = player, let playerItem = player.currentItem else { return }
+  func compareImages(mainImage: CIImage, frameImage: CIImage) -> CIImage {
+    let mainExtent = mainImage.extent
+    let frameExtent = frameImage.extent
     
-    Task {
-      do {
-        let videoComposition = try await AVVideoComposition.videoComposition(with: playerItem.asset) { request in
-          let ciImage = request.sourceImage.clampedToExtent()
-          var filteredImage = self.applyFilters(to: ciImage)
-          if let comparisonResult = self.comparePixels(image1: mainImage, image2: filteredImage) {
-            filteredImage = comparisonResult
-          }
-          request.finish(with: filteredImage, context: self.ciContext)
-        }
-        playerItem.videoComposition = videoComposition
-      } catch {
-        print("Error setting up video composition: \(error)")
-      }
+    guard mainExtent == frameExtent else {
+      return frameImage
     }
+    
+    let differenceFilter = CIFilter(name: "CIDifferenceBlendMode")!
+    differenceFilter.setValue(mainImage, forKey: kCIInputImageKey)
+    differenceFilter.setValue(frameImage, forKey: kCIInputBackgroundImageKey)
+    
+    let differenceImage = differenceFilter.outputImage!
+    
+    let thresholdFilter = CIFilter(name: "CIColorMatrix")!
+    thresholdFilter.setValue(differenceImage, forKey: kCIInputImageKey)
+    thresholdFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
+    thresholdFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
+    thresholdFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
+    thresholdFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: threshold), forKey: "inputAVector")
+    
+    let thresholdedImage = thresholdFilter.outputImage!
+    
+    let transparencyFilter = CIFilter(name: "CIColorMatrix")!
+    transparencyFilter.setValue(thresholdedImage, forKey: kCIInputImageKey)
+    transparencyFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputRVector")
+    transparencyFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputGVector")
+    transparencyFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputBVector")
+    transparencyFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: 1), forKey: "inputAVector")
+    
+    return transparencyFilter.outputImage!
   }
+
+//  func applyPixelComparison() {
+//    guard let mainImage = mainComparisonImage else { return }
+//    guard let player = player, let playerItem = player.currentItem else { return }
+//    
+//    Task {
+//      do {
+//        let videoComposition = try await AVVideoComposition.videoComposition(with: playerItem.asset) { request in
+//          let ciImage = request.sourceImage.clampedToExtent()
+//          var filteredImage = self.applyFilters(to: ciImage)
+//          if let comparisonResult = self.comparePixels(image1: mainImage, image2: filteredImage) {
+//            filteredImage = comparisonResult
+//          }
+//          request.finish(with: filteredImage, context: self.ciContext)
+//        }
+//        playerItem.videoComposition = videoComposition
+//      } catch {
+//        print("Error setting up video composition: \(error)")
+//      }
+//    }
+//  }
 }
 //
 //  What you don't see, forensics
